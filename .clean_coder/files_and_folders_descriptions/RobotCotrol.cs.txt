@@ -1,0 +1,9 @@
+File responsible for robot arm simulation and control in Unity, focusing on autonomous targeting and data recording.
+
+Key integration points:
+- Controls robot arm joints using auto-aim calculations
+- Captures camera images during simulation
+- Records episode data (actions, states, images) to JSON
+- Automatically shoots projectiles towards a target
+
+The script manages a robotic shooting system, generating actions, capturing sensor data, and logging episode information for potential machine learning or analysis purposes.

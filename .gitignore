@@ -1,0 +1,4 @@
+*.meta
+.clean_coder
+.coderrules
+.git
