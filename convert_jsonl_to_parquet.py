@@ -46,7 +46,9 @@ def convert_jsonl_to_parquet():
         repo_id="Grigorij/fanuc_shooting_sim_unity",
         root=converted_dataset_path,
         features=features,
-        fps=10
+        fps=10,
+        image_writer_processes=2,
+        image_writer_threads=4,
     )
 
     print(f"Found {len(jsonl_files)} JSONL files to convert.")
@@ -62,7 +64,7 @@ def convert_jsonl_to_parquet():
             lines = f.readlines()
 
         frame_index = 0
-        
+
         for line in lines:
             frame_data = json.loads(line.strip())
 
@@ -85,9 +87,6 @@ def convert_jsonl_to_parquet():
             frame_index += 1
 
         dataset.save_episode()
-
-        # Remove the original JSONL file after successful conversion
-        jsonl_file.unlink()
 
     print(f"\nConversion complete!")
 
