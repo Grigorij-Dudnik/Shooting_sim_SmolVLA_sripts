@@ -43,7 +43,7 @@ public class DatasetRecorder : MonoBehaviour
         CreateDirectoryIfNotExists(videosPath);
         CreateDirectoryIfNotExists(metaPath);
 
-        LoadOrCreateMetadata();
+        //LoadOrCreateMetadata();
     }
 
     public void StartEpisode()
@@ -77,7 +77,7 @@ public class DatasetRecorder : MonoBehaviour
     {
         WriteDataFile();
         ProcessVideoFrames();
-        UpdateMetadataFiles();
+        //UpdateMetadataFiles();
         var cameraCaptureScript = captureCamera.GetComponent<FFmpegOut.CameraCapture>();
         cameraCaptureScript.FinalizeCapture();
         episodeIndex++;
@@ -89,11 +89,13 @@ public class DatasetRecorder : MonoBehaviour
         {
             Directory.CreateDirectory(path);
         }
+    }
+
     private void LoadOrCreateMetadata()
     {
         string infoFilePath = Path.Combine(metaPath, "info.json");
         string tasksFilePath = Path.Combine(metaPath, "tasks.jsonl");
-        
+
         if (File.Exists(infoFilePath))
         {
             string json = File.ReadAllText(infoFilePath);
@@ -107,7 +109,7 @@ public class DatasetRecorder : MonoBehaviour
             globalFrameIndex = 0;
             WriteInitialInfoFile();
         }
-        
+
         if (!File.Exists(tasksFilePath))
         {
             JObject taskInfo = new JObject
@@ -117,7 +119,6 @@ public class DatasetRecorder : MonoBehaviour
             };
             File.WriteAllText(tasksFilePath, JsonConvert.SerializeObject(taskInfo) + "\n");
         }
-    }
     }
 
     private void WriteInitialInfoFile()
@@ -133,7 +134,7 @@ public class DatasetRecorder : MonoBehaviour
             ["total_videos"] = 0,
             ["chunks_size"] = 1000,
             ["splits"] = new JObject { ["train"] = "0:0" },
-            ["data_path"] = "data/chunk-{episode_chunk:03d}/episode_{episode_index:06d}.jsonl",
+            ["data_path"] = "data/chunk-{episode_chunk:03d}/episode_{episode_index:06d}.parquet",
             ["video_path"] = "videos/chunk-{episode_chunk:03d}/{video_key}/episode_{episode_index:06d}.mp4",
             ["features"] = new JObject
             {
@@ -208,7 +209,7 @@ public class DatasetRecorder : MonoBehaviour
     private void WriteDataFile()
     {
         string dataFilePath = Path.Combine(dataPath, "episode_" + episodeIndex.ToString("D6") + ".jsonl");
-        StringBuilder fileContent = new StringBuilder();
+        var allFrameData = new List<string>();
         for (int i = 0; i < frameIndex; i++)
         {
             JObject frameData = new JObject
@@ -217,9 +218,11 @@ public class DatasetRecorder : MonoBehaviour
                 ["action"] = JArray.FromObject(episodeActions[i]),
                 ["observation.state"] = JArray.FromObject(episodeStates[i])
             };
-            fileContent.AppendLine(JsonConvert.SerializeObject(frameData));
+            allFrameData.Add(JsonConvert.SerializeObject(frameData));
         }
-        File.WriteAllText(dataFilePath, fileContent.ToString());
+            string fileContent = string.Join("\n", allFrameData);
+            File.WriteAllText(dataFilePath, fileContent);
+
     }
 
     private void ProcessVideoFrames()

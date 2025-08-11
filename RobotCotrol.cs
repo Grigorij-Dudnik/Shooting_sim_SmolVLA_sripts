@@ -27,8 +27,10 @@ public class RobotControl : MonoBehaviour
     
 
     public bool episodeComplete = false;
+    bool dataCollectionComplete = false;
     private float episodeStartTime;
     float episodeDuration = 5.0f;
+    float videoMargin = 0.5f; // seconds
 
     int imageWidth;
     int imageHeight;
@@ -59,7 +61,7 @@ public class RobotControl : MonoBehaviour
         timeSinceLastControl += Time.deltaTime;
         
         // Check if it's time to run control logic
-        if (timeSinceLastControl >= controlInterval)
+        if ((timeSinceLastControl >= controlInterval) && !dataCollectionComplete)
         {
             // Run existing control logic
             actionVector = AutoAimPolicy();
@@ -73,6 +75,11 @@ public class RobotControl : MonoBehaviour
         
         // Check for episode timeout
         if (Time.time - episodeStartTime >= episodeDuration)
+        {
+            dataCollectionComplete = true;
+        }
+        // Check for episode timeout
+        if (Time.time - episodeStartTime >= episodeDuration + videoMargin)
         {
             episodeComplete = true;
         }
