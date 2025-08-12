@@ -5,6 +5,9 @@ using System;
 
 public class RobotControl : MonoBehaviour
 {
+    [Header("Mode Selection")]
+    public bool inferenceMode = true;
+
     public JointController[] jointControllers;
     public DatasetRecorder recorder;
 
@@ -18,7 +21,12 @@ public class RobotControl : MonoBehaviour
 
     float maxDegreesPerSecond = 5.0f;
     float[] state = new float[3];
-    float[] actionVector = new float[3];
+    float[] actionVector = new float[4];
+
+    // gRPC client configuration (for inference mode)
+    private SocketPolicyClient policyClient;
+    private string serverHost = "127.0.0.1";
+    private int serverPort = 9000;
     
     // Control timing variables
     public float controlFPS = 10f;
@@ -32,22 +40,33 @@ public class RobotControl : MonoBehaviour
     float episodeDuration = 5.0f;
     float videoMargin = 0.5f; // seconds
 
-    int imageWidth;
-    int imageHeight;
+    int jpgQuality = 80;
 
     bool shot_already = false;
+
+    private Texture2D screenshotTexture;
+    private RenderTexture renderTexture;
+
 
 
     void Start()
     {
         controlInterval = 1f / controlFPS;
         episodeStartTime = Time.time;
-        
-        // Get video dimensions from DatasetRecorder
-        imageWidth = recorder.videoWidth;
-        imageHeight = recorder.videoHeight;
-        
-        recorder.StartEpisode();
+
+        renderTexture = new RenderTexture(recorder.videoWidth, recorder.videoHeight, 24);
+        screenshotTexture = new Texture2D(recorder.videoWidth, recorder.videoHeight, TextureFormat.RGB24, false);
+
+
+        // Initialize based on mode
+        if (inferenceMode)
+        {
+            policyClient = new SocketPolicyClient(serverHost, serverPort);
+        }
+        else
+        {
+            recorder.StartEpisode();
+        }
 
         // place target randomly
         target.position = new Vector3(UnityEngine.Random.Range(-2f, 2f), 0.3f, UnityEngine.Random.Range(-9f, -10f));
@@ -55,7 +74,7 @@ public class RobotControl : MonoBehaviour
     }
 
     // Update is called once per frame, perfect for continuous movement.
-    void Update()
+    void FixedUpdate()
     {
         // Accumulate time
         timeSinceLastControl += Time.deltaTime;
@@ -64,11 +83,25 @@ public class RobotControl : MonoBehaviour
         if ((timeSinceLastControl >= controlInterval) && !dataCollectionComplete)
         {
             // Run existing control logic
-            actionVector = AutoAimPolicy();
+            if (inferenceMode)
+            {
+                // Get current observation first without applying any action
+                var (currentState, imageDataBefore, _) = GetCurrentObservation();
+                actionVector = policyClient.GetAction(imageDataBefore, currentState, Time.time);
+            }
+            else
+            {
+                actionVector = AutoAimPolicy();
+            }
+
             var (state, imageData, success) = DoSimulationStep(actionVector);
             float timestampInEpisode = Time.time - episodeStartTime;
-            recorder.RecordStep(actionVector, state, timestampInEpisode, imageData.jpgData);
-            
+
+            if (!inferenceMode)
+            {
+                recorder.RecordStep(actionVector, state, timestampInEpisode, imageData);
+            }
+
             // Reset timer
             timeSinceLastControl -= controlInterval;
         }
@@ -86,7 +119,16 @@ public class RobotControl : MonoBehaviour
         // Check for episode completion
         if (episodeComplete)
         {
-            recorder.FinalizeEpisode();
+            if (inferenceMode)
+            {
+                // Cleanup gRPC connection
+                policyClient?.Shutdown();
+            }
+            else
+            {
+                recorder.FinalizeEpisode();
+            }
+
             #if UNITY_EDITOR
                 UnityEditor.EditorApplication.isPlaying = false;
             #else
@@ -95,7 +137,7 @@ public class RobotControl : MonoBehaviour
         }
     }
 
-    public (float[] state, (byte[] jpgData, int width, int height), bool episode_succeed) DoSimulationStep(float[] actionVector)
+    public (float[] state, byte[] jpgData, bool episode_succeed) DoSimulationStep(float[] actionVector)
     {
 
         for (int i = 0; i < 3; i++)
@@ -112,18 +154,27 @@ public class RobotControl : MonoBehaviour
         bool episode_succeed = false;
 
         //Debug.Log(string.Join(", ", state));
-        var (jpgData, imWidth, imHeight) = GetCameraImage();
+        var jpgData = GetCameraImage();
 
-        return (state, (jpgData, imWidth, imHeight), episode_succeed);
+        return (state, jpgData, episode_succeed);
     }
 
-    public (byte[] jpgData, int width, int height) GetCameraImage()
+    public (float[] state, byte[] jpgData, bool episode_succeed) GetCurrentObservation()
     {
-        // Create a temporary RenderTexture
-        RenderTexture renderTexture = new RenderTexture(imageWidth, imageHeight, 24);
-        
-        // Set the camera to render to our RenderTexture
-        RenderTexture previousTarget = PistolCam.targetTexture;
+        // Get current state without applying any action
+        for (int i = 0; i < 3; i++)
+        {
+            state[i] = jointControllers[i].GetNormalizedAngle();
+        }
+
+        bool episode_succeed = false;
+        var jpgData = GetCameraImage();
+
+        return (state, jpgData, episode_succeed);
+    }
+
+    public byte[] GetCameraImage()
+    {
         PistolCam.targetTexture = renderTexture;
         
         // Render the camera
@@ -131,24 +182,19 @@ public class RobotControl : MonoBehaviour
         
         // Create a Texture2D and read the RenderTexture into it
         RenderTexture.active = renderTexture;
-        Texture2D screenshot = new Texture2D(imageWidth, imageHeight, TextureFormat.RGB24, false);
-        screenshot.ReadPixels(new Rect(0, 0, imageWidth, imageHeight), 0, 0);
-        screenshot.Apply();
-        
+        screenshotTexture.ReadPixels(new Rect(0, 0, renderTexture.width, renderTexture.height), 0, 0);
+        screenshotTexture.Apply();
+
+
         // Restore camera and RenderTexture settings
-        PistolCam.targetTexture = previousTarget;
+        PistolCam.targetTexture = null;
         RenderTexture.active = null;
 
         // Convert to PNG byte array
-        int quality = 80;
-        byte[] jpgData = screenshot.EncodeToJPG(quality);
-        
-        // Clean up
-        DestroyImmediate(screenshot);
-        DestroyImmediate(renderTexture);
-        
+        byte[] jpgData = screenshotTexture.EncodeToJPG(jpgQuality);
+
         // Return the image data with dimensions
-        return (jpgData, imageWidth, imageHeight);
+        return jpgData;
     }
 
     float[] AutoAimPolicy()
