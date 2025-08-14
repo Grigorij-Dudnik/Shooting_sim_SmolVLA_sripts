@@ -41,7 +41,7 @@ class PolicyServer:
         observation = {
             "observation.images.main": image_tensor.unsqueeze(0),
             "observation.state": state_tensor.unsqueeze(0),
-            "task": "Shoot the can",
+            "task": "Shoot the red cup with straw",
         }
         # Get action
         with torch.no_grad():

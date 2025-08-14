@@ -3,6 +3,8 @@ from pathlib import Path
 import numpy as np
 from PIL import Image
 from lerobot.datasets.lerobot_dataset import LeRobotDataset
+import shutil
+import os
 
 
 # Configuration
@@ -13,6 +15,17 @@ converted_dataset_path = "/home/gregor/Experiments/fanuc_shooting_sim_unity_data
 def convert_jsonl_to_parquet():
     dataset_path_obj = Path(dataset_path)
     data_path = dataset_path_obj / "data" / "chunk-000"
+    meta_path = dataset_path_obj / "meta" / "meta.json"
+
+    # remove converted_dataset_path folder if exists
+    if os.path.exists(converted_dataset_path):
+        shutil.rmtree(converted_dataset_path)
+
+    # Read metadata for FPS
+    with open(meta_path, 'r') as f:
+        metadata = json.load(f)
+        fps = int(metadata['fps'])
+
 
     jsonl_files = [f for f in data_path.iterdir() if f.suffix == '.jsonl']
     if not jsonl_files:
@@ -46,7 +59,7 @@ def convert_jsonl_to_parquet():
         repo_id="Grigorij/fanuc_shooting_sim_unity",
         root=converted_dataset_path,
         features=features,
-        fps=10,
+        fps=fps,
         image_writer_processes=2,
         image_writer_threads=4,
     )
@@ -56,7 +69,7 @@ def convert_jsonl_to_parquet():
     for jsonl_file in jsonl_files:
         # Extract episode index from filename
         episode_index = int(jsonl_file.stem.split('_')[1])
-        
+
         # Construct path to episode frames folder
         episode_frames_folder = Path(dataset_path) / "videos" / "chunk-000" / "observation.images.main" / f"episode_{episode_index:06d}_frames"
 
@@ -71,7 +84,7 @@ def convert_jsonl_to_parquet():
             # Construct image path
             image_filename = f"frame_{frame_index:05d}.jpg"
             image_path = episode_frames_folder / image_filename
-            
+
             # Load image as numpy array
             image = Image.open(image_path)
             image_array = np.array(image, dtype=np.uint8)
@@ -83,12 +96,12 @@ def convert_jsonl_to_parquet():
                 'observation.images.main': image_array
             }
             dataset.add_frame(lerobot_frame, task="Shoot the can")
-            
+
             frame_index += 1
 
         dataset.save_episode()
 
-    print(f"\nConversion complete!")
+    print("\nConversion complete!")
 
 if __name__ == "__main__":
     convert_jsonl_to_parquet()

@@ -19,34 +19,25 @@ public class bullet_script : MonoBehaviour
 
     }
 
-    // Add this to your projectile script
-    void OnTriggerEnter(Collider other)
+    // Coroutine to handle delay after hit
+    private System.Collections.IEnumerator CompleteEpisodeAfterDelay()
     {
-        Debug.Log("Projectile hit: " + other.name);
-        if (other.transform == target)
+        yield return new WaitForSeconds(0.5f);
+        Debug.Log("Time to finish");
+        if (robotControl != null)
         {
-            // Projectile hit the target
-            Debug.Log("Direct hit!");
-            if (robotControl != null)
-            {
-                robotControl.episodeComplete = true;
-            }
-            Destroy(gameObject); // Destroy projectile
+            robotControl.episodeComplete = true;
         }
+        Destroy(gameObject); // Destroy projectile after the delay
     }
-    // Should be here. Without that function OnTriggerEnter not works
+
     void OnCollisionEnter(Collision collision)
     {
-        Debug.Log("Projectile hit: " + collision.gameObject.name);
         if (collision.transform == target)
         {
             // Projectile hit the target
             Debug.Log("Direct hit!");
-            if (robotControl != null)
-            {
-                robotControl.episodeComplete = true;
-            }
-            Destroy(gameObject); // Destroy projectile
+            StartCoroutine(CompleteEpisodeAfterDelay());
         }
     }
 }

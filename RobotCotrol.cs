@@ -8,6 +8,12 @@ public class RobotControl : MonoBehaviour
     [Header("Mode Selection")]
     public bool inferenceMode = true;
 
+    [Header("Episode Management")]
+    public int nr_episodes = 50;
+    private int current_episode = 0;
+    public SceneController sceneController;
+    private Quaternion[] initialJointRotations;
+
     public JointController[] jointControllers;
     public DatasetRecorder recorder;
 
@@ -38,8 +44,6 @@ public class RobotControl : MonoBehaviour
     bool dataCollectionComplete = false;
     private float episodeStartTime;
     float episodeDuration = 5.0f;
-    float videoMargin = 0.5f; // seconds
-
     int jpgQuality = 80;
 
     bool shot_already = false;
@@ -53,10 +57,17 @@ public class RobotControl : MonoBehaviour
     {
         controlInterval = 1f / controlFPS;
         episodeStartTime = Time.time;
+        current_episode = 0;
+
+        // Store initial joint rotations
+        initialJointRotations = new Quaternion[jointControllers.Length];
+        for (int i = 0; i < jointControllers.Length; i++)
+        {
+            initialJointRotations[i] = jointControllers[i].transform.localRotation;
+        }
 
         renderTexture = new RenderTexture(recorder.videoWidth, recorder.videoHeight, 24);
         screenshotTexture = new Texture2D(recorder.videoWidth, recorder.videoHeight, TextureFormat.RGB24, false);
-
 
         // Initialize based on mode
         if (inferenceMode)
@@ -65,16 +76,12 @@ public class RobotControl : MonoBehaviour
         }
         else
         {
-            recorder.StartEpisode();
+            recorder.StartEpisode(controlFPS);
         }
-
-        // place target randomly
-        target.position = new Vector3(UnityEngine.Random.Range(-2f, 2f), 0.3f, UnityEngine.Random.Range(-9f, -10f));
-
     }
 
     // Update is called once per frame, perfect for continuous movement.
-    void FixedUpdate()
+    void Update()
     {
         // Accumulate time
         timeSinceLastControl += Time.deltaTime;
@@ -109,11 +116,6 @@ public class RobotControl : MonoBehaviour
         // Check for episode timeout
         if (Time.time - episodeStartTime >= episodeDuration)
         {
-            dataCollectionComplete = true;
-        }
-        // Check for episode timeout
-        if (Time.time - episodeStartTime >= episodeDuration + videoMargin)
-        {
             episodeComplete = true;
         }
         // Check for episode completion
@@ -122,19 +124,59 @@ public class RobotControl : MonoBehaviour
             if (inferenceMode)
             {
                 // Cleanup gRPC connection
-                policyClient?.Shutdown();
+                policyClient?.Dispose();
+                
+                #if UNITY_EDITOR
+                    UnityEditor.EditorApplication.isPlaying = false;
+                #else
+                    Application.Quit();
+                #endif
             }
             else
             {
                 recorder.FinalizeEpisode();
+                current_episode++;
+                
+                if (current_episode < nr_episodes)
+                {
+                    ResetForNewEpisode();
+                }
+                else
+                {
+                    #if UNITY_EDITOR
+                        UnityEditor.EditorApplication.isPlaying = false;
+                    #else
+                        Application.Quit();
+                    #endif
+                }
             }
-
-            #if UNITY_EDITOR
-                UnityEditor.EditorApplication.isPlaying = false;
-            #else
-                Application.Quit();
-            #endif
         }
+    }
+    private void ResetForNewEpisode()
+    {
+        // Reset scene using the unified method
+        if (sceneController != null)
+        {
+            sceneController.RandomizeScene();
+        }
+        
+        // Reset robot state and joint positions
+        for (int i = 0; i < jointControllers.Length; i++)
+        {
+            jointControllers[i].rotationSpeed = 0f;
+            jointControllers[i].transform.localRotation = initialJointRotations[i];
+        }
+        
+        // Reset timing variables
+        episodeStartTime = Time.time;
+        timeSinceLastControl = 0f;
+        episodeComplete = false;
+        dataCollectionComplete = false;
+        shot_already = false;
+
+        Debug.Log($"Starting episode {current_episode + 1}/{nr_episodes}");
+        // Start new episode recording
+        recorder.StartEpisode(controlFPS);
     }
 
     public (float[] state, byte[] jpgData, bool episode_succeed) DoSimulationStep(float[] actionVector)

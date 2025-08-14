@@ -14,8 +14,7 @@ public class DatasetRecorder : MonoBehaviour
     [SerializeField] Camera captureCamera;
     [SerializeField] public int videoWidth = 640;
     [SerializeField] public int videoHeight = 480;
-    private const string taskName = "Shoot the can";
-    private const int taskIndex = 0;
+    [SerializeField] public string taskName = "Shoot the can";
     private string datasetName = "Robot_shooting_dataset";
     private string datasetPath;
     private string dataPath;
@@ -43,7 +42,7 @@ public class DatasetRecorder : MonoBehaviour
         CreateDirectoryIfNotExists(videosPath);
     }
 
-    public void StartEpisode()
+    public void StartEpisode(float fps)
     {
         frameIndex = 0;
         episodeActions.Clear();
@@ -51,12 +50,12 @@ public class DatasetRecorder : MonoBehaviour
         episodeTimestamps.Clear();
 
         episodeIndex = GetEpisodeIndex();
+        
+        // Create or update metadata with current task and fps
+        CreateOrUpdateMetadata(fps);
+        
         tempImageFolderPath = Path.Combine(Application.temporaryCachePath, "episode_" + episodeIndex);
         CreateDirectoryIfNotExists(tempImageFolderPath);
-
-        var cameraCapture = captureCamera.GetComponent<FFmpegOut.CameraCapture>();
-        cameraCapture.episodeIndex = episodeIndex;
-        cameraCapture.mainCameraKey = mainCameraKey;
     }
 
     public void RecordStep(float[] action, float[] state, float timestamp, byte[] imageData)
@@ -75,8 +74,6 @@ public class DatasetRecorder : MonoBehaviour
     {
         WriteDataFile();
         ProcessVideoFrames();
-        var cameraCaptureScript = captureCamera.GetComponent<FFmpegOut.CameraCapture>();
-        cameraCaptureScript.FinalizeCapture();
     }
 
     private void CreateDirectoryIfNotExists(string path)
@@ -126,5 +123,46 @@ public class DatasetRecorder : MonoBehaviour
     {
         string finalFramesPath = Path.Combine(videosPath, "episode_" + episodeIndex.ToString("D6") + "_frames");
         Directory.Move(tempImageFolderPath, finalFramesPath);
+    }
+    
+    private void CreateOrUpdateMetadata(float fps)
+    {
+        CreateDirectoryIfNotExists(metaPath);
+
+        string metaFilePath = Path.Combine(metaPath, "meta.json");
+        JObject metadata;
+
+        // Load existing metadata or create new
+        if (File.Exists(metaFilePath))
+        {
+            metadata = JObject.Parse(File.ReadAllText(metaFilePath));
+        }
+        else
+        {
+            metadata = new JObject
+            {
+                ["dataset_name"] = datasetName,
+                ["fps"] = fps,
+                ["video_width"] = videoWidth,
+                ["video_height"] = videoHeight,
+                ["tasks"] = new JArray()
+            };
+        }
+
+        // Add current task if not already present
+        JArray tasks = (JArray)metadata["tasks"];
+        if (!tasks.Any(t => t["task_name"]?.ToString() == taskName))
+        {
+            // Calculate the next task index based on existing tasks
+            int nextTaskIndex = tasks.Count > 0 ? tasks.Max(t => (int)t["task_index"]) + 1 : 0;
+            
+            tasks.Add(new JObject
+            {
+                ["task_name"] = taskName,
+                ["task_index"] = nextTaskIndex
+            });
+        }
+
+        File.WriteAllText(metaFilePath, metadata.ToString(Formatting.Indented));
     }
 }

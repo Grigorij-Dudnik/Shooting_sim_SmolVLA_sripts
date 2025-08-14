@@ -39,13 +39,13 @@ public class SocketPolicyClient : System.IDisposable
         {
             // Serialize observation
             byte[] message = SerializeObservation(timestamp, imageData, jointStates);
-            
+
             // Send message with length prefix
             SendMessage(message);
 
             // Receive response
             byte[] response = ReceiveMessage();
-            
+
             // Parse action
             return ParseAction(response);
         }
@@ -63,18 +63,18 @@ public class SocketPolicyClient : System.IDisposable
         {
             // Write timestamp
             WriteFloat(writer, timestamp);
-            
+
             // Write image data
             WriteUInt32(writer, (uint)imageData.Length);
             writer.Write(imageData);
-            
+
             // Write joint states
             WriteUInt32(writer, (uint)jointStates.Length);
             foreach (float value in jointStates)
             {
                 WriteFloat(writer, value);
             }
-            
+
             return stream.ToArray();
         }
     }
@@ -86,12 +86,12 @@ public class SocketPolicyClient : System.IDisposable
         {
             uint count = ReadUInt32(reader);
             float[] actions = new float[count];
-            
+
             for (int i = 0; i < count; i++)
             {
                 actions[i] = ReadFloat(reader);
             }
-            
+
             return actions;
         }
     }
@@ -101,7 +101,7 @@ public class SocketPolicyClient : System.IDisposable
         // Send length prefix
         byte[] lengthBytes = GetBigEndianBytes((uint)data.Length);
         networkStream.Write(lengthBytes, 0, 4);
-        
+
         // Send data
         networkStream.Write(data, 0, data.Length);
     }
@@ -111,7 +111,7 @@ public class SocketPolicyClient : System.IDisposable
         // Receive length
         byte[] lengthBytes = ReceiveExact(4);
         uint length = ParseBigEndianUInt32(lengthBytes);
-        
+
         // Receive data
         return ReceiveExact((int)length);
     }
@@ -120,7 +120,7 @@ public class SocketPolicyClient : System.IDisposable
     {
         byte[] buffer = new byte[count];
         int offset = 0;
-        
+
         while (offset < count)
         {
             int received = networkStream.Read(buffer, offset, count - offset);
@@ -128,7 +128,7 @@ public class SocketPolicyClient : System.IDisposable
                 throw new Exception("Server disconnected");
             offset += received;
         }
-        
+
         return buffer;
     }
 
@@ -185,10 +185,5 @@ public class SocketPolicyClient : System.IDisposable
     {
         networkStream?.Close();
         tcpClient?.Close();
-    }
-
-    public void Shutdown()
-    {
-        Dispose();
     }
 }
