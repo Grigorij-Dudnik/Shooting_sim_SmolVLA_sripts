@@ -12,7 +12,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 class PolicyServer:
     def __init__(self):
-        self.policy_path: str = "/home/gregor/Experiments/lerobot/outputs/train/2025-08-11/19-51-35_smolvla/checkpoints/last/pretrained_model"
+        self.policy_path: str = "/home/gregor/Experiments/lerobot/outputs/train/2025-08-14/11-49-17_smolvla/checkpoints/last/pretrained_model"
         self.policy_type: str = "smolvla"
         self.host: str = "127.0.0.1"
         self.port: int = 9000

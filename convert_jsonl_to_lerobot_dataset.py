@@ -26,12 +26,10 @@ def convert_jsonl_to_parquet():
         metadata = json.load(f)
         fps = int(metadata['fps'])
 
-
     jsonl_files = [f for f in data_path.iterdir() if f.suffix == '.jsonl']
     if not jsonl_files:
         print("No JSONL files found in the data directory.")
         return
-
     features = {
         "action": {
             "dtype": "float32",
@@ -76,6 +74,7 @@ def convert_jsonl_to_parquet():
         with open(jsonl_file, 'r') as f:
             lines = f.readlines()
 
+        task_name = json.loads(lines[0].strip())['task']
         frame_index = 0
 
         for line in lines:
@@ -95,7 +94,7 @@ def convert_jsonl_to_parquet():
                 'observation.state': np.array(frame_data['observation.state'], dtype=np.float32),
                 'observation.images.main': image_array
             }
-            dataset.add_frame(lerobot_frame, task="Shoot the can")
+            dataset.add_frame(lerobot_frame, task=task_name)
 
             frame_index += 1
 

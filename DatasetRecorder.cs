@@ -110,7 +110,8 @@ public class DatasetRecorder : MonoBehaviour
             {
                 ["timestamp"] = episodeTimestamps[i],
                 ["action"] = JArray.FromObject(episodeActions[i]),
-                ["observation.state"] = JArray.FromObject(episodeStates[i])
+                ["observation.state"] = JArray.FromObject(episodeStates[i]),
+                ["task"] = taskName
             };
             allFrameData.Add(JsonConvert.SerializeObject(frameData));
         }
