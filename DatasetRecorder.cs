@@ -12,9 +12,9 @@ public class DatasetRecorder : MonoBehaviour
 {
     // Configuration
     [SerializeField] Camera captureCamera;
+    [SerializeField] RobotControl robotControl;
     [SerializeField] public int videoWidth = 640;
     [SerializeField] public int videoHeight = 480;
-    [SerializeField] public string taskName = "Shoot the can";
     private string datasetName = "Robot_shooting_dataset";
     private string datasetPath;
     private string dataPath;
@@ -111,7 +111,7 @@ public class DatasetRecorder : MonoBehaviour
                 ["timestamp"] = episodeTimestamps[i],
                 ["action"] = JArray.FromObject(episodeActions[i]),
                 ["observation.state"] = JArray.FromObject(episodeStates[i]),
-                ["task"] = taskName
+                ["task"] = robotControl.taskName
             };
             allFrameData.Add(JsonConvert.SerializeObject(frameData));
         }
@@ -152,14 +152,14 @@ public class DatasetRecorder : MonoBehaviour
 
         // Add current task if not already present
         JArray tasks = (JArray)metadata["tasks"];
-        if (!tasks.Any(t => t["task_name"]?.ToString() == taskName))
+        if (!tasks.Any(t => t["task_name"]?.ToString() == robotControl.taskName))
         {
             // Calculate the next task index based on existing tasks
             int nextTaskIndex = tasks.Count > 0 ? tasks.Max(t => (int)t["task_index"]) + 1 : 0;
-            
+
             tasks.Add(new JObject
             {
-                ["task_name"] = taskName,
+                ["task_name"] = robotControl.taskName,
                 ["task_index"] = nextTaskIndex
             });
         }

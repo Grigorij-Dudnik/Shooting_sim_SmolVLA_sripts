@@ -24,6 +24,7 @@ public class RobotControl : MonoBehaviour
     public GameObject projectilePrefab;
     public Transform barrel;
     public Transform target;
+    public string taskName = "Shoot red paper bottle with straw";
 
     float maxDegreesPerSecond = 5.0f;
     float[] state = new float[3];
@@ -94,7 +95,7 @@ public class RobotControl : MonoBehaviour
             {
                 // Get current observation first without applying any action
                 var (currentState, imageDataBefore, _) = GetCurrentObservation();
-                actionVector = policyClient.GetAction(imageDataBefore, currentState, Time.time);
+                actionVector = policyClient.GetAction(imageDataBefore, currentState, Time.time, taskName);
             }
             else
             {
@@ -123,7 +124,7 @@ public class RobotControl : MonoBehaviour
         {
             if (inferenceMode)
             {
-                // Cleanup gRPC connection
+                // Cleanup connection
                 policyClient?.Dispose();
                 
                 #if UNITY_EDITOR

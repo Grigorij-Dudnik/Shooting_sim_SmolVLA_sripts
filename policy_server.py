@@ -12,7 +12,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 class PolicyServer:
     def __init__(self):
-        self.policy_path: str = "/home/gregor/Experiments/lerobot/outputs/train/2025-08-14/11-49-17_smolvla/checkpoints/last/pretrained_model"
+        self.policy_path: str = "/home/gregor/Experiments/lerobot/outputs/train/2025-08-19/16-56-36_smolvla/checkpoints/last/pretrained_model"
         self.policy_type: str = "smolvla"
         self.host: str = "127.0.0.1"
         self.port: int = 9000
@@ -28,7 +28,7 @@ class PolicyServer:
 
         self.image_transform = transforms.Compose([transforms.ToTensor()])
 
-    def process_observation(self, timestamp, image_data, joint_states):
+    def process_observation(self, timestamp, image_data, joint_states, task_name):
         # Prepare image
         pil_image = Image.open(io.BytesIO(image_data)).convert("RGB")
         
@@ -41,7 +41,7 @@ class PolicyServer:
         observation = {
             "observation.images.main": image_tensor.unsqueeze(0),
             "observation.state": state_tensor.unsqueeze(0),
-            "task": "Shoot the red cup with straw",
+            "task": task_name,
         }
         # Get action
         with torch.no_grad():
@@ -78,9 +78,11 @@ class PolicyServer:
                         break
 
                     # Parse observation
-                    timestamp, image_data, joint_states = self._parse_observation(message_data)
+                    # Parse observation
+                    timestamp, image_data, joint_states, task_name = self._parse_observation(message_data)
+                    print(f"Received task: {task_name}.")
                     # Process and get action
-                    action = self.process_observation(timestamp, image_data, joint_states)
+                    action = self.process_observation(timestamp, image_data, joint_states, task_name)
 
                     # Send response
                     response = self._serialize_action(action)
@@ -123,8 +125,13 @@ class PolicyServer:
             value = struct.unpack('!f', data[data_offset:data_offset+4])[0]
             joint_states.append(value)
             data_offset += 4
+        # Read task name
+        task_length = struct.unpack('!I', data[data_offset:data_offset+4])[0]
+        data_offset += 4
+        task_name = data[data_offset:data_offset+task_length].decode('utf-8')
+        data_offset += task_length
 
-        return timestamp, image_data, joint_states
+        return timestamp, image_data, joint_states, task_name
 
     def _serialize_action(self, action):
         data = struct.pack('!I', len(action))

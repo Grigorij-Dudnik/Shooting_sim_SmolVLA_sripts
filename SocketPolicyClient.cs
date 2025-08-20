@@ -33,12 +33,12 @@ public class SocketPolicyClient : System.IDisposable
         }
     }
 
-    public float[] GetAction(byte[] imageData, float[] jointStates, float timestamp)
+    public float[] GetAction(byte[] imageData, float[] jointStates, float timestamp, string taskName)
     {
         try
         {
             // Serialize observation
-            byte[] message = SerializeObservation(timestamp, imageData, jointStates);
+            byte[] message = SerializeObservation(timestamp, imageData, jointStates, taskName);
 
             // Send message with length prefix
             SendMessage(message);
@@ -56,7 +56,7 @@ public class SocketPolicyClient : System.IDisposable
         }
     }
 
-    private byte[] SerializeObservation(float timestamp, byte[] imageData, float[] jointStates)
+    private byte[] SerializeObservation(float timestamp, byte[] imageData, float[] jointStates, string taskName)
     {
         using (var stream = new MemoryStream())
         using (var writer = new BinaryWriter(stream))
@@ -74,6 +74,11 @@ public class SocketPolicyClient : System.IDisposable
             {
                 WriteFloat(writer, value);
             }
+
+            // Write task name
+            byte[] taskBytes = System.Text.Encoding.UTF8.GetBytes(taskName);
+            WriteUInt32(writer, (uint)taskBytes.Length);
+            writer.Write(taskBytes);
 
             return stream.ToArray();
         }
