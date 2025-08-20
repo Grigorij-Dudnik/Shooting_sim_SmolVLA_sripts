@@ -5,7 +5,7 @@ public class SceneController : MonoBehaviour
 {
     [Header("Lighting Settings")]
     [SerializeField] private Light[] sceneLights;
-    [SerializeField] private float minLightIntensity = 0.5f;
+    [SerializeField] private float minLightIntensity = 1.0f;
     [SerializeField] private float maxLightIntensity = 2.0f;
     [SerializeField] private Color[] lightColors = { Color.white, Color.yellow, new Color(1f, 0.9f, 0.8f), new Color(0.9f, 0.9f, 1f) };
     
@@ -21,6 +21,8 @@ public class SceneController : MonoBehaviour
     [SerializeField] private Rigidbody[] itemObjects;
     [SerializeField] private Vector3 itemAreaMin = new Vector3(-3f, 1f, -3f);
     [SerializeField] private Vector3 itemAreaMax = new Vector3(3f, 3f, 3f);
+    
+    private List<GameObject> spawnedItems = new List<GameObject>();
 
     void Start()
     {
@@ -49,7 +51,7 @@ public class SceneController : MonoBehaviour
             if (sceneLight.type == LightType.Directional)
             {
                 Vector3 randomRotation = new Vector3(
-                    Random.Range(-30f, 30f),  // Pitch variation
+                    Random.Range(10f, 80f),   // Pitch variation (always from above, 10-80 degrees from horizontal)
                     Random.Range(0f, 360f),   // Yaw full rotation
                     0f                        // No roll
                 );
@@ -75,7 +77,7 @@ public class SceneController : MonoBehaviour
         {
             // Select random prefab
             GameObject randomPrefab = backgroundObjectPrefabs[Random.Range(0, backgroundObjectPrefabs.Length)];
-            
+
             // Random position within defined area
             Vector3 randomPosition = new Vector3(
                 Random.Range(backgroundAreaMin.x, backgroundAreaMax.x),
@@ -115,6 +117,10 @@ public class SceneController : MonoBehaviour
             );
             item.transform.position = randomPosition;
             item.transform.rotation = new Quaternion(0, 0, 0, 1);
+            
+            // Reset velocities
+            item.linearVelocity = Vector3.zero;
+            item.angularVelocity = Vector3.zero;
         }
     }
 

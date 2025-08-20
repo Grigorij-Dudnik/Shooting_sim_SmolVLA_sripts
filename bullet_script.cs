@@ -36,7 +36,6 @@ public class bullet_script : MonoBehaviour
         if (collision.transform == target)
         {
             // Projectile hit the target
-            Debug.Log("Direct hit!");
             StartCoroutine(CompleteEpisodeAfterDelay());
         }
     }
