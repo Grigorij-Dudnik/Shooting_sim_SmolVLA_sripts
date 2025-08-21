@@ -126,7 +126,7 @@ public class SceneController : MonoBehaviour
 
     public void RandomizeScene()
     {
-        RandomizeLighting();
+        //RandomizeLighting();
         RandomizeFurniture();
         RandomizeItems();
     }

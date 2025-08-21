@@ -12,7 +12,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 class PolicyServer:
     def __init__(self):
-        self.policy_path: str = "/home/gregor/Experiments/lerobot/outputs/train/2025-08-19/16-56-36_smolvla/checkpoints/last/pretrained_model"
+        self.policy_path: str = "/home/gregor/Experiments/lerobot/outputs/train/2025-08-20/14-31-10_smolvla/checkpoints/last/pretrained_model"
         self.policy_type: str = "smolvla"
         self.host: str = "127.0.0.1"
         self.port: int = 9000
@@ -80,7 +80,8 @@ class PolicyServer:
                     # Parse observation
                     # Parse observation
                     timestamp, image_data, joint_states, task_name = self._parse_observation(message_data)
-                    print(f"Received task: {task_name}.")
+                    print(f"Task: {task_name}.")
+                    print(f"Joint states: {joint_states}")
                     # Process and get action
                     action = self.process_observation(timestamp, image_data, joint_states, task_name)
 

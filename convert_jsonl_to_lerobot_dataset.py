@@ -10,7 +10,7 @@ import os
 # Configuration
 current_script_dir = Path(__file__).parent
 dataset_path = current_script_dir.parent / "Robot_shooting_dataset"
-converted_dataset_path = "/home/gregor/Experiments/fanuc_shooting_sim_unity_dataset_posred"
+converted_dataset_path = "/home/gregor/Experiments/Shooting_sim_unity_dataset"
 
 def convert_jsonl_to_parquet():
     dataset_path_obj = Path(dataset_path)
@@ -58,7 +58,7 @@ def convert_jsonl_to_parquet():
         root=converted_dataset_path,
         features=features,
         fps=fps,
-        image_writer_processes=2,
+        image_writer_processes=3,
         image_writer_threads=4,
     )
 

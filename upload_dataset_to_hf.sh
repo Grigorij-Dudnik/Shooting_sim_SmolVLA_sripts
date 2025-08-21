@@ -1,6 +1,6 @@
 git add .
 git commit -m "update"
-git --force push
+git push --force
 
 git push --delete origin v2.1
 git tag -d v2.1

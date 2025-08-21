@@ -41,7 +41,7 @@ public class RobotControl : MonoBehaviour
     private float controlInterval;
     
 
-    public bool episodeComplete = false;
+    [NonSerialized] public bool episodeComplete = false;
     bool dataCollectionComplete = false;
     private float episodeStartTime;
     float episodeDuration = 5.0f;
@@ -80,6 +80,14 @@ public class RobotControl : MonoBehaviour
             recorder.StartEpisode(controlFPS);
         }
     }
+    void OnDestroy()
+    {
+        // Ensure socket is properly closed when the script is destroyed
+        if (inferenceMode && policyClient != null)
+        {
+            policyClient.Dispose();
+        }
+    }
 
     // Update is called once per frame, perfect for continuous movement.
     void Update()
@@ -115,41 +123,27 @@ public class RobotControl : MonoBehaviour
         }
         
         // Check for episode timeout
-        if (Time.time - episodeStartTime >= episodeDuration)
+        if (!inferenceMode && Time.time - episodeStartTime >= episodeDuration)
         {
             episodeComplete = true;
         }
         // Check for episode completion
-        if (episodeComplete)
+        if (episodeComplete && !inferenceMode)
         {
-            if (inferenceMode)
+            recorder.FinalizeEpisode();
+            current_episode++;
+            
+            if (current_episode < nr_episodes)
             {
-                // Cleanup connection
-                policyClient?.Dispose();
-                
+                ResetForNewEpisode();
+            }
+            else
+            {
                 #if UNITY_EDITOR
                     UnityEditor.EditorApplication.isPlaying = false;
                 #else
                     Application.Quit();
                 #endif
-            }
-            else
-            {
-                recorder.FinalizeEpisode();
-                current_episode++;
-                
-                if (current_episode < nr_episodes)
-                {
-                    ResetForNewEpisode();
-                }
-                else
-                {
-                    #if UNITY_EDITOR
-                        UnityEditor.EditorApplication.isPlaying = false;
-                    #else
-                        Application.Quit();
-                    #endif
-                }
             }
         }
     }
@@ -265,7 +259,7 @@ public class RobotControl : MonoBehaviour
         //Debug.Log($"Azimuth: {targetAzimuth:F1}, Elevation: {targetElevation:F1}");
 
         float angleMoveCoefficient = 0.5f;
-        float shoting_threshold = 0.05f;
+        float shoting_threshold = 0.1f;
         actions[0] = Math.Clamp(targetAzimuth * angleMoveCoefficient, -1, 1);
         actions[1] = Math.Clamp(-targetElevation * angleMoveCoefficient/2, -1, 1);
         actions[2] = Math.Clamp(-targetElevation * angleMoveCoefficient/2, -1, 1);
