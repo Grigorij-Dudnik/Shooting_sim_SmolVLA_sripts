@@ -286,4 +286,10 @@ public class RobotControl : MonoBehaviour
         // Destroy it after 0.5 seconds
         Destroy(newProjectile, 0.5f);
     }
+    public void HandleBadEpisode()
+    {
+        if (inferenceMode) return;
+        recorder?.DiscardEpisode();
+        ResetForNewEpisode();
+    }
 }

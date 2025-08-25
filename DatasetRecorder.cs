@@ -125,6 +125,12 @@ public class DatasetRecorder : MonoBehaviour
         string finalFramesPath = Path.Combine(videosPath, "episode_" + episodeIndex.ToString("D6") + "_frames");
         Directory.Move(tempImageFolderPath, finalFramesPath);
     }
+    public void DiscardEpisode()
+    {
+        Debug.Log("Discarding bad episode.");
+        if (!string.IsNullOrEmpty(tempImageFolderPath) && Directory.Exists(tempImageFolderPath))
+            Directory.Delete(tempImageFolderPath, true);
+    }
     
     private void CreateOrUpdateMetadata(float fps)
     {

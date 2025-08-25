@@ -66,7 +66,7 @@ public class SceneController : MonoBehaviour
         foreach (GameObject obj in spawnedBackgroundObjects)
         {
             if (obj != null)
-                DestroyImmediate(obj);
+                Destroy(obj);
         }
         spawnedBackgroundObjects.Clear();
 

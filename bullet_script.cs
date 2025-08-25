@@ -33,11 +33,31 @@ public class bullet_script : MonoBehaviour
 
     void OnCollisionEnter(Collision collision)
     {
-        if (collision.transform == target)
+        // handle only the first collision
+        var col = GetComponent<Collider>();
+        if (col != null && !col.enabled) return;
+        if (col != null) col.enabled = false;
+
+        bool isTarget = target != null && (collision.transform == target || collision.transform.IsChildOf(target));
+        
+        // Check for bad episode conditions - first object hit is not the target or target is hit but not standing
+        if (!isTarget || (isTarget && !IsTargetStanding()))
         {
-            // Projectile hit the target
-            StartCoroutine(CompleteEpisodeAfterDelay());
+            if (robotControl != null && !robotControl.inferenceMode) robotControl.HandleBadEpisode();
+            return;
         }
+
+        // If we reach here, it's a good episode - target hit and standing
+        StartCoroutine(CompleteEpisodeAfterDelay());
+    }
+
+    private bool IsTargetStanding()
+    {
+        if (target == null) return false;
+
+        // Check if target is roughly upright (Y axis pointing up)
+        float uprightThreshold = 0.866f; // cos(30°) ≈ 0.866
+        return Vector3.Dot(target.up, Vector3.up) > uprightThreshold;
     }
 }
 
