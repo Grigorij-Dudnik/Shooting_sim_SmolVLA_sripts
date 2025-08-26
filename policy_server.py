@@ -2,6 +2,8 @@ import logging
 import io
 import socket
 import struct
+import time
+
 import torch
 from PIL import Image
 from torchvision import transforms
@@ -43,9 +45,12 @@ class PolicyServer:
             "observation.state": state_tensor.unsqueeze(0),
             "task": task_name,
         }
+        a = time.perf_counter()
         # Get action
         with torch.no_grad():
             action_chunk = self.policy.predict_action_chunk(observation)
+        b = time.perf_counter()
+        print(f"policy run time is {b-a} s")
 
         # Return first action from chunk
         action = action_chunk.squeeze(0).cpu().numpy()
@@ -55,6 +60,7 @@ class PolicyServer:
         # Create socket
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        server_socket.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
         server_socket.bind((self.host, self.port))
         server_socket.listen(1)
         logging.info(f"Socket server listening on {self.host}:{self.port}")

@@ -22,6 +22,7 @@ public class SocketPolicyClient : System.IDisposable
         try
         {
             tcpClient = new TcpClient();
+            tcpClient.NoDelay = true;
             tcpClient.Connect(host, port);
             networkStream = tcpClient.GetStream();
             Debug.Log($"Socket client connected to {host}:{port}");

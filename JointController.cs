@@ -5,11 +5,11 @@ public class JointController : MonoBehaviour
     public Vector3 rotationDirection = Vector3.up;
     public float rotationSpeed = 0f; // degrees per second
     
-    void Update()
+    void FixedUpdate()
     {
         if (rotationSpeed != 0f)
         {
-            float rotationThisFrame = rotationSpeed * Time.deltaTime;
+            float rotationThisFrame = rotationSpeed * Time.fixedDeltaTime;
             transform.Rotate(rotationDirection, rotationThisFrame, Space.Self);
         }
     }

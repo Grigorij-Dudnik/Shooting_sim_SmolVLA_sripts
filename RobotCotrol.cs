@@ -2,6 +2,9 @@ using UnityEngine;
 using System.IO;
 using System.Collections.Generic;
 using System;
+using System.Diagnostics; // Add this to the top of your file
+using Debug = UnityEngine.Debug; // Add this to avoid name conflicts
+
 
 public class RobotControl : MonoBehaviour
 {
@@ -42,15 +45,19 @@ public class RobotControl : MonoBehaviour
     
 
     [NonSerialized] public bool episodeComplete = false;
-    bool dataCollectionComplete = false;
+
     private float episodeStartTime;
     float episodeDuration = 5.0f;
-    int jpgQuality = 80;
+    int jpgQuality = 70;
 
     bool shot_already = false;
 
     private Texture2D screenshotTexture;
     private RenderTexture renderTexture;
+    private bool gpuReadbackPending = false;
+    private byte[] latestJpgData = null;
+
+    private Stopwatch stopwatch = new Stopwatch();
 
 
 
@@ -67,8 +74,8 @@ public class RobotControl : MonoBehaviour
             initialJointRotations[i] = jointControllers[i].transform.localRotation;
         }
 
-        renderTexture = new RenderTexture(recorder.videoWidth, recorder.videoHeight, 24);
-        screenshotTexture = new Texture2D(recorder.videoWidth, recorder.videoHeight, TextureFormat.RGB24, false);
+        renderTexture = new RenderTexture(recorder.videoWidth, recorder.videoHeight, 24, RenderTextureFormat.ARGB32);
+        screenshotTexture = new Texture2D(recorder.videoWidth, recorder.videoHeight, TextureFormat.RGBA32, false);
 
         // Initialize based on mode
         if (inferenceMode)
@@ -79,6 +86,9 @@ public class RobotControl : MonoBehaviour
         {
             recorder.StartEpisode(controlFPS);
         }
+        
+        // Warm up async readback
+        CaptureFrameAsync();
     }
     void OnDestroy()
     {
@@ -90,28 +100,34 @@ public class RobotControl : MonoBehaviour
     }
 
     // Update is called once per frame, perfect for continuous movement.
-    void Update()
+    void FixedUpdate()
     {
         // Accumulate time
-        timeSinceLastControl += Time.deltaTime;
+        timeSinceLastControl += Time.fixedDeltaTime;
         
         // Check if it's time to run control logic
-        if ((timeSinceLastControl >= controlInterval) && !dataCollectionComplete)
+        if (timeSinceLastControl >= controlInterval)
         {
+            stopwatch.Restart();
+            var (currentState, imageData) = GetCurrentObservation();
+            stopwatch.Stop();
+            Debug.Log($"Get Frame save Time: {stopwatch.ElapsedMilliseconds} ms");
+
+            stopwatch.Restart();
             // Run existing control logic
             if (inferenceMode)
             {
-                // Get current observation first without applying any action
-                var (currentState, imageDataBefore, _) = GetCurrentObservation();
-                actionVector = policyClient.GetAction(imageDataBefore, currentState, Time.time, taskName);
+                actionVector = policyClient.GetAction(imageData, currentState, Time.time, taskName);
             }
             else
             {
                 actionVector = AutoAimPolicy();
             }
 
-            var (state, imageData, success) = DoSimulationStep(actionVector);
+            var (state, success) = DoSimulationStep(actionVector);
             float timestampInEpisode = Time.time - episodeStartTime;
+            stopwatch.Stop();
+            Debug.Log($"Get Action Time: {stopwatch.ElapsedMilliseconds} ms");
 
             if (!inferenceMode)
             {
@@ -121,7 +137,15 @@ public class RobotControl : MonoBehaviour
             // Reset timer
             timeSinceLastControl -= controlInterval;
         }
-        
+    }
+
+    void Update()
+    {
+        CheckEpisodeCompletion();
+    }
+    
+    void CheckEpisodeCompletion()
+    {
         // Check for episode timeout
         if (!inferenceMode && Time.time - episodeStartTime >= episodeDuration)
         {
@@ -154,19 +178,18 @@ public class RobotControl : MonoBehaviour
         {
             sceneController.RandomizeScene();
         }
-        
+
         // Reset robot state and joint positions
         for (int i = 0; i < jointControllers.Length; i++)
         {
             jointControllers[i].rotationSpeed = 0f;
             jointControllers[i].transform.localRotation = initialJointRotations[i];
         }
-        
+
         // Reset timing variables
         episodeStartTime = Time.time;
         timeSinceLastControl = 0f;
         episodeComplete = false;
-        dataCollectionComplete = false;
         shot_already = false;
 
         Debug.Log($"Starting episode {current_episode + 1}/{nr_episodes}");
@@ -174,7 +197,7 @@ public class RobotControl : MonoBehaviour
         recorder.StartEpisode(controlFPS);
     }
 
-    public (float[] state, byte[] jpgData, bool episode_succeed) DoSimulationStep(float[] actionVector)
+    public (float[] state, bool episode_succeed) DoSimulationStep(float[] actionVector)
     {
 
         for (int i = 0; i < 3; i++)
@@ -190,50 +213,65 @@ public class RobotControl : MonoBehaviour
 
         bool episode_succeed = false;
 
-        //Debug.Log(string.Join(", ", state));
-        var jpgData = GetCameraImage();
-
-        return (state, jpgData, episode_succeed);
+        return (state, episode_succeed);
     }
 
-    public (float[] state, byte[] jpgData, bool episode_succeed) GetCurrentObservation()
+    public (float[] state, byte[] jpgData) GetCurrentObservation()
     {
         // Get current state without applying any action
         for (int i = 0; i < 3; i++)
         {
             state[i] = jointControllers[i].GetNormalizedAngle();
         }
-
-        bool episode_succeed = false;
         var jpgData = GetCameraImage();
 
-        return (state, jpgData, episode_succeed);
+        return (state, jpgData);
     }
 
     public byte[] GetCameraImage()
     {
-        PistolCam.targetTexture = renderTexture;
+        byte[] result = latestJpgData;
         
-        // Render the camera
-        PistolCam.Render();
+        if (!gpuReadbackPending)
+        {
+            CaptureFrameAsync();
+        }
         
-        // Create a Texture2D and read the RenderTexture into it
-        RenderTexture.active = renderTexture;
-        screenshotTexture.ReadPixels(new Rect(0, 0, renderTexture.width, renderTexture.height), 0, 0);
-        screenshotTexture.Apply();
-
-
-        // Restore camera and RenderTexture settings
-        PistolCam.targetTexture = null;
-        RenderTexture.active = null;
-
-        // Convert to PNG byte array
-        byte[] jpgData = screenshotTexture.EncodeToJPG(jpgQuality);
-
-        // Return the image data with dimensions
-        return jpgData;
+        if (result == null)
+        {
+            return new byte[0];
+        }
+        
+        return result;
     }
 
+    void CaptureFrameAsync()
+    {
+        if (gpuReadbackPending) return;
+        
+        PistolCam.targetTexture = renderTexture;
+        PistolCam.Render();
+        
+        UnityEngine.Rendering.AsyncGPUReadback.Request(renderTexture, 0, TextureFormat.RGBA32, OnReadbackComplete);
+        
+        PistolCam.targetTexture = null;
+        gpuReadbackPending = true;
+    }
+    void OnReadbackComplete(UnityEngine.Rendering.AsyncGPUReadbackRequest request)
+    {
+        gpuReadbackPending = false;
+        
+        if (request.hasError)
+        {
+            Debug.LogWarning("GPU readback failed");
+            return;
+        }
+        
+        var data = request.GetData<byte>();
+        screenshotTexture.LoadRawTextureData(data);
+        screenshotTexture.Apply(false);
+        latestJpgData = screenshotTexture.EncodeToJPG(jpgQuality);
+    }
     float[] AutoAimPolicy()
     {
         float[] actions = new float[4];
