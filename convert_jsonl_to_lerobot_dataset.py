@@ -65,6 +65,11 @@ def convert_jsonl_to_parquet():
     print(f"Found {len(jsonl_files)} JSONL files to convert.")
 
     for jsonl_file in jsonl_files:
+        # skip if file is empty, print a warning
+        if os.path.getsize(jsonl_file) == 0:
+            print(f"Warning: {jsonl_file} is empty, skipping.")
+            continue
+
         # Extract episode index from filename
         episode_index = int(jsonl_file.stem.split('_')[1])
 

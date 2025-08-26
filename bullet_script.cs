@@ -23,7 +23,6 @@ public class bullet_script : MonoBehaviour
     private System.Collections.IEnumerator CompleteEpisodeAfterDelay()
     {
         yield return new WaitForSeconds(0.5f);
-        Debug.Log("Time to finish");
         if (robotControl != null)
         {
             robotControl.episodeComplete = true;

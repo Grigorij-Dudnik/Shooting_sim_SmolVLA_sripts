@@ -283,8 +283,8 @@ public class RobotControl : MonoBehaviour
         Rigidbody rb = newProjectile.GetComponent<Rigidbody>();
         rb.linearVelocity = barrel.forward * projectileSpeed;
         
-        // Destroy it after 0.5 seconds
-        Destroy(newProjectile, 0.5f);
+        // Destroy it after 0.8 seconds
+        Destroy(newProjectile, 0.8f);
     }
     public void HandleBadEpisode()
     {
